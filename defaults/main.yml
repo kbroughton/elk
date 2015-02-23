@@ -26,3 +26,7 @@ elk_kibana:
     - 127.0.0.1
 elk_nginx:
   user: nginx
+
+monitrc_force_overwrite: no
+
+elk_ntp_service_name: ntp

@@ -1,6 +1,6 @@
 ---
 elk_common_packages:
-    - openntpd
+    - "{{elk_ntp_service_name}}"
     - python-apt
     - python-pycurl
     - python-pip

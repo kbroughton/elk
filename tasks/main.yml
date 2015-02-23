@@ -12,6 +12,7 @@
     src=monitrc
     dest=/etc/monit/monitrc
     owner=root group=root mode=600
+    force="{{monitrc_force_overwrite}}"
   sudo: yes
   notify: Restart monit
 
