@@ -2,7 +2,7 @@
 - name: Kibana archive available
   get_url:
     dest=/opt
-    url=https://download.elasticsearch.org/kibana/kibana/kibana-{{ elk_kibana.version }}.tar.gz
+    url=https://download.elastic.co/kibana/kibana/kibana-{{ elk_kibana.version }}.tar.gz
     owner={{ elk_nginx.user }} group={{ elk_nginx.user }}
   sudo: yes
   register: new_archive_downloaded
@@ -24,7 +24,7 @@
 
 - name: Kibana files ownership
   file:
-    path={{ elk_kibana.path }}
+    path=/opt/kibana-{{ elk_kibana.version }}
     state=directory
     owner={{ elk_nginx.user }} group={{ elk_nginx.user }} recurse=yes
   changed_when: False
@@ -46,6 +46,7 @@
     creates: /etc/nginx/conf.d/.kibana.htpasswd
   sudo: yes
   register: http_pass_gen
+  when: elk_kibana.user is defined and elk_kibana.password is defined
 
 - name: Kibana htpassword file permissions
   file:
@@ -53,7 +54,7 @@
     owner={{ elk_nginx.user }} group=root mode=400
   sudo: yes
   when: http_pass_gen|changed
-
+    
 - name: Nginx config file
   template:
     src=kibana-default.j2
