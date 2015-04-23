@@ -6,12 +6,56 @@
 # https://github.com/elasticsearch/elasticsearch/blob/master/config/elasticsearch.yml
 #
 
-############################## Scripting ######################################
-
-script.groovy.sandbox.enabled: true
-
 ############################## Network And HTTP ###############################
 
-{% if elk_elasticsearch.http.port is defined %}
-http.port: {{ elk_elasticsearch.http.port }}
+# {{ansible_managed}}
+
+cluster.name: {{elasticsearch.cluster.name}}
+node.master: {% if inventory_hostname in groups['elasticsearch_master'] %}
+true
+{% else %}
+false
 {% endif %}
+node.data: {% if inventory_hostname in groups['elasticsearch_data'] %}
+true
+{% else %}
+false
+{% endif %}
+node.name: {{inventory_hostname}}
+http.port: {{elasticsearch.http.port}}
+index.number_of_shards: {{elasticsearch.index.number_of_shards}}
+index.number_of_replicas: {{elasticsearch.index.number_of_replicas}}
+index.refresh_interval: {{elasticsearch.index.refresh_interval}}
+index.merge.policy.merge_factor: {{elasticsearch.index.merge.policy.merge_factor}}
+
+index.store.type: {{elasticsearch.index.store.type}}
+index.store.fs.memory.enabled: {{elasticsearch.index.store.fs.memory.enabled}}
+
+path.conf: {{ES_CONF_DIR}}
+path.data: {{ES_DATA_DIR}}
+path.work: {{ES_WORK_DIR}}
+path.logs: {{ES_LOG_DIR}}
+path.plugins: {{ES_PLUGINS_DIR}}
+bootstrap.mlockall: {{elasticsearch.bootstrap.mlockall}}
+{% if 'vagrant_vms' in groups %}
+network.host: {{mapped_interface_1}}
+{% else %}
+# network.host: {{mapped_interface_1}}
+{% endif %}
+
+gateway.recover_after_nodes: {{elasticsearch.gateway.recover_after_nodes}}
+threadpool.bulk.type: {{elasticsearch.threadpool.bulk.type}}
+threadpool.bulk.size: {{elasticsearch.threadpool.bulk.size}}
+
+discovery.zen.minimum_master_nodes: {{elasticsearch.discovery.zen.minimum_master_nodes}}
+discovery.zen.ping_multicast_enabled: {{elasticsearch.discovery.zen.ping_multicast_enabled}}
+discovery.zen.ping.unicast.hosts: {{groups['elasticsearch']}}
+
+indices.store.throttle.type: {{elasticsearch.indices.store.throttle.type}}
+indices.store.throttle.max_bytes_per_sec: {{elasticsearch.indices.store.throttle.max_bytes_per_sec}}
+
+marvel.agent.exporter.es.hosts: {{groups['elasticsearch_monitor']}}
+
+marvel.agent.enabled: {{elasticsearch.marvel.agent.enabled}}
+
+script.disable_dynamic: {{elasticsearch.script.disable_dynamic }}

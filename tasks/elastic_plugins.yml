@@ -10,31 +10,7 @@
  - name: Install plugins 
    command: creates="{{ES_PLUGINS_DIR}}/{{item.creates}}"
             "{{ES_HOME}}/bin/plugin" -install "{{item.plugin}}"
-   with_items:
-     - { plugin: mobz/elasticsearch-head, creates: head }
-     - { plugin: royrusso/elasticsearch-HQ, creates: HQ }
-
- - name: Install legacy plugins 
-   command: creates="{{ES_PLUGINS_DIR}}/{{item.creates}}"
-            "{{ES_HOME}}/bin/plugin" -install "{{item.plugin}}"
-   with_items:
-     - { plugin: "elasticsearch/elasticsearch-transport-thrift/{{transport_plugin_version}}", creates: transport-thrift}
-     - { plugin: "elasticsearch/elasticsearch-analysis-phonetic/{{phonetic_plugin_version}}", creates: analysis-phonetic}
-   when: ES_DOT_VERSION == "0.90.5"
-
- - name: Copy monitoring plugin to localhost
-   get_url: dest="{{_ansible_downloads}}/{{elasticsearch_monitor_plugin_jar}}"
-           url="{{elasticsearch_base_url}}/{{elasticsearch_monitor_plugin_jar}}" 
-           owner="{{ES_USER}}" group="{{ES_GROUP}}" force=yes
-   when: install_jmx_elasticsearch_monitor_plugin == 'yes'
-
- - name: Install custom monitoring plugin 
-   command: "{{ES_HOME}}/bin/plugin --url file:////{{_ansible_downloads}}/{{elasticsearch_monitor_plugin_jar}} --install elasticsearch-monitor-plugin"
-   when: install_jmx_elasticsearch_monitor_plugin == 'yes'
-
- - name: Remove the custom monitoring plugin jar file
-   file: dest="/tmp/{{elasticsearch_monitor_plugin_jar}}" state=absent
-   when: install_jmx_elasticsearch_monitor_plugin == 'yes'
+   with_items: elastic_plugins
 
  - name: Set ownership on plugins
    shell: chown -R "{{ES_USER}}:{{ES_USER}}" "{{ES_HOME}}/plugins"

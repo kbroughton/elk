@@ -24,6 +24,8 @@
   sudo: yes
   notify: Restart elasticsearch
 
+- include: elastic_plugins.yml
+
 - name: Make monit to look after ES
   template:
     src=elasticsearch.monitrc.conf.j2
