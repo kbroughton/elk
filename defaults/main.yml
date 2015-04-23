@@ -6,33 +6,252 @@ elk_java:
     - oracle-java7-set-default
   openjdk:
     - openjdk-7-jre-headless
-
 elk_elasticsearch:
   version: 1.4
   pid_file: /var/run/elasticsearch.pid
   http:
     port: 9200
-
 elk_logstash:
   version: 1.4
   pid_file: /var/run/logstash.pid
   configs:
     - { src: logstash-simple.conf.j2, dest: simple.conf }
-  patterns: [] # optional; follows same format as `configs`
-
 elk_kibana:
-  version: 4.0.2-linux-x64
+  version: 4.0.0-beta3
   path: /opt/kibana
   port: 5601
-  user: kibana # optional; if unset, kibana does not require authentication
-  password: kibana # optional; if unset, kibana does not require authentication
+  user: kibana
+  password: kibana
   allowed_addresses:
     - 127.0.0.1
-
 elk_nginx:
-  port: 80
   user: nginx
 
 monitrc_force_overwrite: no
 
 elk_ntp_service_name: ntp
+
+# vars/main.yml for elasticsearch
+# Use this file to gather vars common to all tasks for this role
+
+elasticsearch:
+ symlink_data_target: "no"
+ jmx:
+  port: 12001
+  rmi:
+    port: 12051
+    enabled: "true"
+  security:
+    enabled: "true"
+  authenticate: "true"
+  client:
+    authenticate: "true"
+  ssl: 
+    enabled: "true"
+    properties_path: "{{ES_CONF_DIR}}/ssl.properties"
+  registry:
+    ssl:
+      enabled: "true"
+  management_properties:
+    enabled: "true"
+    path: "{{ES_CONF_DIR}}/management.properties"
+  keystore:
+    path: "{{jmx.keystore.path}}"
+    password: "{{ssl_certs.keystore_password}}"
+  truststore:
+    path: "{{jmx.truststore.path}}"
+    password: "{{ssl_certs.truststore_password}}"
+ script:
+   disable_dynamic: "true"
+ bootstrap:
+   mlockall: "true"
+
+
+ http:
+   port: 9200
+ transport:
+   port: 9300
+ network:
+   host: "{{mapped_interface_1}}"
+
+ # set minimum_master_nodes to 1/2 nodes + 1, or 1 for single nodes.
+ discovery:
+   zen:
+   # for n > 3 need something like {% groups['elasticsearch'] | length() // 2 + 1 %}
+   # Should be n/2 rounded up.
+     minimum_master_nodes: 1
+     ping_multicast_enabled: "false"
+     #ping_unicast_hosts: "192.168.0.13,192.168.0.14,192.168.0.15"
+
+ threadpool:
+   bulk:
+     type: fixed
+     size: 32 
+
+ # set gateway.recover_after_nodes in ES_CONF, set to number of nodes
+ gateway:
+   recover_after_nodes: 1
+ node:
+   data: "true"
+   master: "true"
+
+ index:
+   number_of_shards: 5
+   number_of_replicas: 1
+   store:
+     throttle:
+       max_bytes_per_sec: 500mb
+       type: node
+
+     type: mmapfs
+     fs:
+       memory:
+         enabled: "false" 
+   # During ingest, set refresh_interval to -1 and merge_factor to 30 during indexing and 
+   # restore to default for search (1s and 10)
+ # http://www.elasticsearch.org/guide/en/elasticsearch/reference/current/indices-update-settings.html
+   refresh_interval: "1s"
+   merge:
+     policy:
+       merge_factor: 10
+     scheduler:
+       max_thread_count: 4
+ indices:
+   store:
+     throttle:
+       # factory default is 20mb.  1000 recommended by Stuart.
+       max_bytes_per_sec: 1000mb
+       type: merge
+ memcached:
+   enabled: "false"
+
+ marvel:
+  agent:
+   enabled: "false"
+
+install_marvel: "no"
+
+# https://groups.google.com/forum/#!msg/elasticsearch/qftwnb1p1sw/4umEIUoaCpsJ
+# cache.memory.small_buffer_size: 1mb
+# cache.memory.large_buffer_size: 10mb
+# cache.memory.small_cache_size: 1000mb
+# cache.memory.large_cache_size: 2000mb
+# defaults https://github.com/elasticsearch/elasticsearch/issues/577
+# cache.memory.small_buffer_size: 1kb
+# cache.memory.large_buffer_size: 1mb
+# cache.memory.small_cache_size: 10mb
+# cache.memory.large_cache_size: 500mb
+
+# normally num_cores/2. 
+# 8 worked best for a 32-core system
+
+
+elasticsearch_base_url: "{{local_mirror_base_url}}"
+ES_DOWNLOAD_URL: "{{local_mirror_base_url}}/elasticsearch-{{ES_DOT_VERSION}}{{ES_INSTALL_FORMAT}}"
+
+
+########### ELASTICSEARCH DIRECTORIES ##########
+
+# These values are templated in scripts/localrc and /etc/default/elasticsearch
+
+
+# Use ES_SYMLINK_HOME for layers above that user elasticsearch such as service wrapper.
+# Deprecated.  Used before 90.5  ES_SYMLINK_HOME: /usr/share/elasticsearch
+# Use ES_HOME for installations/config to a specific version.   
+ES_LOG_DIR: /var/log/elasticsearch
+ES_PROCESS_DIR: /var/run/elasticsearch
+ES_PLUGINS_DIR: "{{ES_HOME}}/plugins"
+ES_DATA_BASE_DIR: /var/lib/elasticsearch
+ES_DATA_DIR: "{{ES_DATA_BASE_DIR}}/elasticsearch"
+ES_CONF_DIR: /etc/elasticsearch
+ES_WORK_DIR: /tmp/elasticsearch 
+ES_DOWNLOADS: "{{_ansible_downloads}}/elasticsearch"
+
+es_dir_list: [
+ "{{ES_HOME}}",
+ "{{ES_LOG_DIR}}",
+ "{{ES_PROCESS_DIR}}",
+ "{{ES_PLUGINS_DIR}}",
+ "{{ES_DATA_DIR}}",
+ "{{ES_CONF_DIR}}",
+ "{{ES_WORK_DIR}}",
+ "{{ES_SERVICE_LOG_DIR}}",
+ "{{ES_HOME}}/scripts",
+ "{{ES_DOWNLOADS}}",
+]
+
+elastic_plugins:
+  - { plugin: mobz/elasticsearch-head, creates: head }
+  - { plugin: royrusso/elasticsearch-HQ, creates: HQ }
+
+ES_DOT_VERSION: 1.2.1
+
+elasticsearch_deb_file: "elasticsearch-{{ES_DOT_VERSION}}.deb"
+
+## ELASTICSEARCH FILES ##
+
+ES_CONF_FILE: "{{ES_CONF_DIR}}/elasticsearch.yml"
+ES_DEFAULT_FILE: "/etc/default/elasticsearch"
+ES_LIB_DIR: "/var/lib/elasticsearch"
+ES_LOG_CONFIG: "{{ES_CONF_DIR}}/logging.yml"
+
+
+ES_USER: elasticsearch
+ES_GROUP: "{{ES_USER}}"
+
+# do not install if already exists
+ES_FORCE_INSTALL: "False"
+
+# TODO   Add unistall step in ansible, was in deprecated centos_server_install
+# Get rid of ES
+ES_UNINSTALL: "False"
+# Use the default config/elasticsearch.yml for debugging
+# This does not affect service wrapper settings.
+ES_USE_FACTORY_SETTINGS: "False"
+
+##### JVM OPTIONS  #######
+
+# JVM heap size in gb. on a dedicated machine, typical is 1/2 of RAM
+#ES_HEAP_SIZE: 
+# These settings are low.  Increase on real machines.
+
+
+# in ES_HOME/bin/elasticsearch.in.sh
+# if [ "x$ES_MIN_MEM" = "x" ]; then
+#     ES_MIN_MEM=256m
+# fi
+# if [ "x$ES_MAX_MEM" = "x" ]; then
+#     ES_MAX_MEM=1g
+# fi
+# if [ "x$ES_HEAP_SIZE" != "x" ]; then
+#     ES_MIN_MEM=$ES_HEAP_SIZE
+#     ES_MAX_MEM=$ES_HEAP_SIZE
+# fi
+
+ES_MAX_OPEN_FILES: 32000
+ES_MAX_MAP_COUNT: 262144
+#VERTICA_MAX_MAP_COUNT: 4123194
+# ES_MAX_MAP_COUNT and VERTICA_MAX_MAP_COUNT control the same system kernel setting
+# See https://my.vertica.com/docs/6.0.x/HTML/index.htm#12962.htm
+# Vertica runs second in site.yml and it's value we be used if co-located
+ES_MAX_LOCKED_MEMORY: unlimited
+#TODO find corrcet options for DIRECT_SIZE
+#ES_DIRECT_SIZE: unlimited
+
+# for quick starts on the server you can run
+# [elasticsearch@server] <ES_HOME>/bin/elasticsearch server_cli_options
+# commandline options 
+# Xmx15g  max memory
+# Xms15g  min memory
+# -f run in foreground
+# -p pid file to create (is this pid to status/stop)
+#    CLI over-rides options set in ES_SERVICE_CONFIG
+
+
+#### end of JVM OPTIONS ########
+
+es_open_ports: 
+  - "80" 
+  - "9000:9999"
+
+
